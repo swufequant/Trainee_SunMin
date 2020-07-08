@@ -4,6 +4,7 @@
 from pymongo import MongoClient as mc
 import json
 import os
+import datetime
 import time
 import pandas as pd
 
@@ -129,6 +130,48 @@ class MongoDBReader(object):
         df = pd.DataFrame(list(cursor))
         if time_stat:
             print("QueryStockDayLine data:{} used time:{:.3f}s".format(len(df), time.time() - time_st))
+        return df
+
+    def QueryStockMinuteLine(self, datetime_st=datetime.datetime(2000, 1, 1, 9, 30, 0),
+                                   datetime_ed=datetime.datetime(2099, 1, 1, 15, 0, 0),
+                                   code="SZ000001", time_stat=False):
+        '''
+        查询指定时间[datetime_st, datetime_ed] 之间指定股票的1分钟K线数据
+        :param date_st:
+        :param date_ed:
+        :param code:
+        :return:
+        '''
+        basename = "admin"
+        tablename = 'StockMinuteLine'
+        time_st = 0.0
+        if time_stat:
+            time_st = time.time()
+        db = self.client.get_database(basename)  # 创建base
+        table = db.get_collection(tablename)  # 获取表
+        condition = {}
+        datatime_condition = {}
+        # 证券代码参数检查
+        code_condition = self.CodeConditionGenerator(code)
+        if code_condition is not None:
+            condition["code"] = code_condition
+        # 起始日期参数检查
+        if datetime_st is not None:
+            datatime_condition["$gte"] = datetime_st
+        # 结束日期参数检查
+        if datetime_ed is not None:
+            datatime_condition["$lte"] = datetime_ed
+        # 日期参数检查
+        if len(datatime_condition) > 0:
+            if datetime_st == datetime_ed:
+                condition["datatime"] = datetime_st
+            else:
+                condition["datatime"] = datatime_condition
+        # 查询
+        cursor = table.find(condition, {"_id": 0})
+        df = pd.DataFrame(list(cursor))
+        if time_stat:
+            print("QueryStockMinuteLine data:{} used time:{:.3f}s".format(len(df), time.time() - time_st))
         return df
 
     def QueryStockInfo(self, code=None, time_stat=False):
@@ -324,6 +367,18 @@ def QueryStockDayLine_Test():
     reader.logoff()
 
 
+def QueryStockMinuteLine_Test():
+    reader = MongoDBReader()
+    reader.login("")
+    df = reader.QueryStockMinuteLine(datetime.datetime(2020, 1, 5), code="SZ000001", time_stat=True)
+    print(df.head())
+    df = reader.QueryStockMinuteLine(datetime.datetime(2015, 1, 5, 10),
+                                     datetime.datetime(2015, 1, 5, 11),
+                                     "SZ000001", time_stat=True)
+    print(df.head())
+    reader.logoff()
+
+
 def QueryStockInfo_Test():
     reader = MongoDBReader()
     reader.login("")
@@ -428,6 +483,7 @@ def QueryUplimitInfo_Test():
 
 if __name__ == "__main__":
     QueryStockDayLine_Test()
+    QueryStockMinuteLine_Test()
     QueryStockInfo_Test()
     QueryStockTickTrade_Test()
     QueryStockTickOrder_Test()
