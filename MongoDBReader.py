@@ -132,6 +132,52 @@ class MongoDBReader(object):
             print("QueryStockDayLine data:{} used time:{:.3f}s".format(len(df), time.time() - time_st))
         return df
 
+    
+    def QueryIndexDayLine(self, date_st=None, date_ed=None, code=None, date_num=0, time_stat=False):
+        '''
+        查询指定日期[date_st, date_ed] 之间 指定申万指数行情
+        :param date_st: 开始日期
+        :param date_ed: 结束日期
+        :param date_num: 需要查询的日期数
+        :param code: 股票代码 SZ000001 SH600000
+        :return:
+        '''
+        basename = "admin"
+        tablename = 'IndexDayLine'
+        time_st = 0.0
+        if time_stat:
+            time_st = time.time()
+        db = self.client.get_database(basename)  # 创建base
+        table = db.get_collection(tablename)  # 获取表
+        condition = {}
+        date_condition = {}
+        # 证券代码参数检查
+        code_condition = self.CodeConditionGenerator(code)
+        if code_condition is not None:
+            condition["code"] = code_condition
+        # 起始日期参数检查
+        if date_st is not None:
+            date_condition["$gte"] = date_st
+        # 结束日期参数检查
+        if date_ed is not None:
+            date_condition["$lte"] = date_ed
+        # 日期参数检查
+        if len(date_condition) > 0:
+            if date_st == date_ed:
+                condition["date"] = date_st
+            else:
+                condition["date"] = date_condition
+        # 查询
+        if date_num > 0:
+            cursor = table.find(condition, {"_id": 0}).limit(date_num)
+        else:
+            cursor = table.find(condition, {"_id": 0})
+        # 合成df
+        df = pd.DataFrame(list(cursor))
+        if time_stat:
+            print("QueryStockDayLine data:{} used time:{:.3f}s".format(len(df), time.time() - time_st))
+        return df
+
     def QueryStockMinuteLine(self, datetime_st=datetime.datetime(2000, 1, 1, 9, 30, 0),
                                    datetime_ed=datetime.datetime(2099, 1, 1, 15, 0, 0),
                                    code="SZ000001", time_stat=False):
@@ -367,6 +413,18 @@ def QueryStockDayLine_Test():
     reader.logoff()
 
 
+def QueryIndexDayLine_Test():
+    reader = MongoDBReader()
+    reader.login("")
+    df = reader.QueryIndexDayLine(20200102, code="SI801020", time_stat=True)
+    print(df.head())
+    df = reader.QueryIndexDayLine(20190102, 20200102, "SI801020", time_stat=True)
+    print(df.head())
+    df = reader.QueryIndexDayLine(20200102, date_num=2, code="SI801020", time_stat=True)
+    print(df.head())
+    reader.logoff()
+
+
 def QueryStockMinuteLine_Test():
     reader = MongoDBReader()
     reader.login("")
@@ -483,6 +541,7 @@ def QueryUplimitInfo_Test():
 
 if __name__ == "__main__":
     QueryStockDayLine_Test()
+    QueryIndexDayLine_Test()
     QueryStockMinuteLine_Test()
     QueryStockInfo_Test()
     QueryStockTickTrade_Test()
